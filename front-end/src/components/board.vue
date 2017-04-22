@@ -35,7 +35,8 @@ export default {
                 leftDown:false,
                 leftMovePath:[],//记录按下过程中的移动轨迹 [ ... [1,2],... ]
 //                leftDownPos:undefined,//左键按下的起始位置
-//                rightDown:false,
+                rightDown:false,
+                rightMovePath:[],//记录按下过程中的移动轨迹 [ ... [1,2],... ]
 //                rightDownPos:undefined,
             },
 
@@ -315,11 +316,24 @@ export default {
             self.buttonState.leftMovePath.push([x,y]) ;//标记起始位置
 //            console.log("self.buttonState.leftMovePath is:"+self.buttonState.leftMovePath);
         },
+        onMouseRightDownCanvas(x,y){
+            var self = this;
+//            console.log(`onMouseLeftDownCanvas:${x},${y}`);
+            self.buttonState.rightDown = true;// 标记左键按下
+            self.buttonState.rightMovePath.push([x,y]) ;//标记起始位置
+//            console.log("self.buttonState.leftMovePath is:"+self.buttonState.leftMovePath);
+        },
         //用于处理当按键在某个坐标抬起时的行为
         onMouseUpCanvas(x,y){
             var self = this;
 //            console.log(`onMouseLeftUpCanvas:${x},${y}`);
-            if(self.buttonState.leftDown){
+            //2个都按下则不处理
+            if(self.buttonState.leftDown && self.buttonState.rightDown){
+                self.buttonState.leftDown=false;
+                self.buttonState.rightDown=false;
+                return;
+            }
+            else if(self.buttonState.leftDown){
                 //如果当前记录按下的是左键，则表示松开的是左键
                 self.buttonState.leftDown=false;
 
@@ -330,15 +344,36 @@ export default {
                 self.sendPaintPathMsg(path,utils.getColorString(self.useColor.val));
                 self.buttonState.leftMovePath = [];//重置path
 //                alert(path);
+            }else if(self.buttonState.rightDown){
+                //如果当前记录按下的是右键，则表示松开的是右键
+                self.buttonState.rightDown=false;
+
+                var path = self.buttonState.rightMovePath;
+
+                //todo:整理轨迹数据，发送给服务器
+                console.log("self.buttonState.rightMovePath is:"+self.buttonState.rightMovePath);
+                self.sendPaintPathMsg(path,utils.getColorString("ffffff"));
+                self.buttonState.rightMovePath = [];//重置path
+//                alert(path);
             }
         },
         //用于处理当按键在移动时候的处理
         onMouseMoveCanvas(x,y){
             var self = this;
+            var path;
 //            console.log(`onMouseMoveCanvas:${x},${y}`);
+            //如果2个按键都按下了，则不做任何处理
+            if(self.buttonState.leftDown && self.buttonState.rightDown){
+                return;
+            }else if(self.buttonState.leftDown){
+                path = self.buttonState.leftMovePath;
+            }else if(self.buttonState.rightDown){
+                path = self.buttonState.rightMovePath;
+            }else{
+                return;
+            }
             //判断当前位置和前一位置对应canvas的坐标是否一致，如果一致则无需重复写入
-            var path = self.buttonState.leftMovePath;
-            if(path.length>0){
+            if(path && path.length>0){
                 if(path[path.length-1][0]==x &&path[path.length-1][1]==y){
                     return;
                 }
@@ -358,24 +393,28 @@ export default {
 //                self.onClickCanvas(self.getPixelPos(relPos.x),self.getPixelPos(relPos.y));
 //            });
             document.getElementById("canvas-container").addEventListener("mousedown",function (evt) {
-//                console.log("catch mousedown:"+evt.buttons);
+                console.log("catch mousedown:"+evt.buttons);
                 if(evt.buttons==1){
-
                     var relPos = self.canvas.relMouseCoords(evt);
                     utils.checkPointLegal(relPos) && self.onMouseLeftDownCanvas(self.getPixelPos(relPos.x),self.getPixelPos(relPos.y))
                 }
+                else if(evt.buttons==2){
+                    var relPos = self.canvas.relMouseCoords(evt);
+                    utils.checkPointLegal(relPos) && self.onMouseRightDownCanvas(self.getPixelPos(relPos.x),self.getPixelPos(relPos.y))
+                }
+                evt.preventDefault();
             });
             document.getElementById("canvas-container").addEventListener("mouseup",function (evt) {
-//                console.log("catch mouseup:"+evt.buttons);
+                console.log("catch mouseup:buttons:"+evt.buttons+"，button:"+evt.button);
                 var relPos = self.canvas.relMouseCoords(evt);
                 utils.checkPointLegal(relPos) && self.onMouseUpCanvas(self.getPixelPos(relPos.x),self.getPixelPos(relPos.y))
             });
             document.getElementById("canvas-container").addEventListener("mousemove",function (evt) {
 //                console.log("catch mousemove:"+evt.buttons);
-                if(evt.buttons==1){
+//                if(evt.buttons==1){
                     var relPos = self.canvas.relMouseCoords(evt);
                     utils.checkPointLegal(relPos) && self.onMouseMoveCanvas(self.getPixelPos(relPos.x),self.getPixelPos(relPos.y))
-                }
+//                }
             });
         },
         //根据当前scale,重新定义canvas大小
